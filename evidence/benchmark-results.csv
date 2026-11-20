@@ -1,0 +1,4 @@
+rows,repetitions,count_without_index,count_with_index,median_without_index_ms,median_with_index_ms
+1000,31,1,1,0.0421,0.0052
+10000,31,1,1,0.4073,0.0058
+100000,31,1,1,64.6942,0.0598

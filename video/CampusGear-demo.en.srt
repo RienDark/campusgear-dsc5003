@@ -1,0 +1,279 @@
+1
+00:00:00,000 --> 00:00:07,171
+This is CampusGear, a database application developed for the Track One project in Storing and Retrieving Data.
+
+2
+00:00:07,171 --> 00:00:17,294
+The problem is straightforward: shared equipment needs a consistent reservation record, and an item must not be promised to two people for overlapping times.
+
+3
+00:00:17,294 --> 00:00:21,091
+All members and equipment in this demonstration are synthetic.
+
+4
+00:00:21,091 --> 00:00:25,309
+This is a local prototype, not an operational university service.
+
+5
+00:00:25,309 --> 00:00:31,636
+The application runs as one Python process with a SQLite database and a browser interface.
+
+6
+00:00:31,636 --> 00:00:39,650
+We will demonstrate the catalogue, create a reservation, reject a conflict, complete a loan, and inspect the actual database.
+
+7
+00:00:39,650 --> 00:00:44,712
+We will also show measured query performance rather than a simulated dashboard.
+
+8
+00:00:44,712 --> 00:00:48,898
+The equipment catalogue is loaded from the backend API.
+
+9
+00:00:48,898 --> 00:00:52,620
+Search and category filters issue real database queries.
+
+10
+00:00:52,620 --> 00:00:57,737
+Each physical item has its own identifier and unique asset tag.
+
+11
+00:00:57,737 --> 00:01:04,714
+Category names are not copied into every reservation: the interface obtains them through relational joins.
+
+12
+00:01:04,714 --> 00:01:12,622
+Members also belong to departments, and a reservation references a member and an item using foreign keys.
+
+13
+00:01:12,622 --> 00:01:16,343
+This keeps descriptive information separate from transaction records.
+
+14
+00:01:16,343 --> 00:01:20,530
+Notice the distinction between equipment condition and reservation status.
+
+15
+00:01:20,530 --> 00:01:27,972
+An item marked available is operational; it does not mean every future time slot is free.
+
+16
+00:01:27,972 --> 00:01:32,159
+Maintenance and retired equipment should not accept new reservations.
+
+17
+00:01:32,159 --> 00:01:35,880
+The member selector is for demonstration, not authentication.
+
+18
+00:01:35,880 --> 00:01:43,414
+Now we select an available item and a synthetic member, enter a purpose, and choose a future interval.
+
+19
+00:01:43,414 --> 00:01:46,344
+The interface labels the input as UTC.
+
+20
+00:01:46,344 --> 00:01:57,226
+The server requires a canonical timestamp including the final Z, validates that it is a real calendar time, and checks that the start precedes the end.
+
+21
+00:01:57,226 --> 00:02:00,575
+On submission, the browser sends a JSON request.
+
+22
+00:02:00,575 --> 00:02:06,016
+The backend starts a write transaction and inserts a reservation with confirmed status.
+
+23
+00:02:06,016 --> 00:02:12,294
+Database constraints validate the references and values, and a trigger checks for conflicting active reservations.
+
+24
+00:02:12,294 --> 00:02:16,061
+The audit event is recorded with the same transaction.
+
+25
+00:02:16,061 --> 00:02:20,665
+Only after a successful commit does the interface refresh the list.
+
+26
+00:02:20,665 --> 00:02:24,432
+This is the full browser, server, and database path.
+
+27
+00:02:24,432 --> 00:02:30,552
+We now attempt a second reservation for the same equipment and the same time interval.
+
+28
+00:02:30,552 --> 00:02:35,040
+The expected result is a conflict, not a second confirmed booking.
+
+29
+00:02:35,040 --> 00:02:40,752
+This rule is protected in the database rather than only in the web form.
+
+30
+00:02:40,752 --> 00:02:50,136
+Two intervals overlap when the existing start is earlier than the proposed end and the existing end is later than the proposed start.
+
+31
+00:02:50,136 --> 00:02:52,992
+The strict comparisons implement half open intervals.
+
+32
+00:02:52,992 --> 00:02:57,072
+Therefore, a reservation beginning exactly when another ends is allowed.
+
+33
+00:02:57,072 --> 00:02:59,112
+We demonstrate that boundary separately.
+
+34
+00:02:59,112 --> 00:03:03,192
+Cancelled and returned reservations do not block new time slots.
+
+35
+00:03:03,192 --> 00:03:11,352
+This policy is a deliberate prototype rule, and concurrent attempts must still obey it when separate database connections are used.
+
+36
+00:03:11,352 --> 00:03:14,313
+Next we check out the confirmed reservation.
+
+37
+00:03:14,313 --> 00:03:21,080
+The application creates a loan record and moves the reservation to checked out within one transaction.
+
+38
+00:03:21,080 --> 00:03:24,463
+A reservation can have at most one loan.
+
+39
+00:03:24,463 --> 00:03:32,499
+The application also prevents two open loans for the same physical item, including bookings with otherwise separate planned intervals.
+
+40
+00:03:32,499 --> 00:03:38,844
+For demonstration, early checkout is permitted; a production system would need an approved pickup window.
+
+41
+00:03:38,844 --> 00:03:44,765
+Returning the equipment records an actual return time and moves the reservation to returned.
+
+42
+00:03:44,765 --> 00:03:48,994
+That is different from simply reaching the planned end time.
+
+43
+00:03:48,994 --> 00:03:54,916
+A confirmed reservation may be cancelled, while a checked out item must be returned.
+
+44
+00:03:54,916 --> 00:03:59,568
+Invalid repeated actions are rejected instead of silently changing historical records.
+
+45
+00:03:59,568 --> 00:04:04,525
+The database inspector reads table and index definitions from SQLite itself.
+
+46
+00:04:04,525 --> 00:04:09,031
+It is not a hard coded picture of the schema.
+
+47
+00:04:09,031 --> 00:04:14,889
+The main relations cover departments, members, categories, equipment, reservations, loans, and audit events.
+
+48
+00:04:14,889 --> 00:04:18,494
+Primary keys identify rows; foreign keys link them.
+
+49
+00:04:18,494 --> 00:04:23,902
+Unique constraints protect asset tags and the one loan per reservation rule.
+
+50
+00:04:23,902 --> 00:04:25,704
+Check constraints restrict domains.
+
+51
+00:04:25,704 --> 00:04:32,013
+Triggers handle the cross row overlap rule that an ordinary row check cannot express.
+
+52
+00:04:32,013 --> 00:04:36,519
+The audit view exposes the effects of our actual actions.
+
+53
+00:04:36,519 --> 00:04:43,729
+This event log helps explain what happened, but it is not a tamper proof security ledger.
+
+54
+00:04:43,729 --> 00:04:51,840
+The application deliberately separates planned reservation times from actual loan timestamps and calculates overdue loans from those facts.
+
+55
+00:04:51,840 --> 00:04:53,699
+Evaluation has two parts.
+
+56
+00:04:53,699 --> 00:05:04,387
+Correctness tests exercise successful operations and rejected boundary cases, including overlap protection, adjacent intervals, state transitions, malformed timestamps, foreign keys, and concurrent requests.
+
+57
+00:05:04,387 --> 00:05:08,104
+The included test output records the real run.
+
+58
+00:05:08,104 --> 00:05:16,469
+The benchmark generates deterministic synthetic reservations at three scales: one thousand, ten thousand, and one hundred thousand rows.
+
+59
+00:05:16,469 --> 00:05:26,692
+It measures the same overlap query without and with the target index, confirms equal results, and records repeated timings and query plans.
+
+60
+00:05:26,692 --> 00:05:29,480
+The report contains the actual measurements.
+
+61
+00:05:29,480 --> 00:05:38,309
+These are warm cache query microbenchmarks on one machine, not network load tests or proof of campus wide scalability.
+
+62
+00:05:38,309 --> 00:05:45,744
+Index maintenance and write costs remain relevant, and the speedup applies only to the measured workload.
+
+63
+00:05:45,744 --> 00:05:52,241
+The main result is a reproducible local application whose database protects a meaningful workflow.
+
+64
+00:05:52,241 --> 00:05:55,025
+It is intentionally not production ready.
+
+65
+00:05:55,025 --> 00:06:03,843
+There is no real login, student versus administrator authorization, single sign on, email notification, payment handling, or deployment hardening.
+
+66
+00:06:03,843 --> 00:06:14,516
+Python's built in HTTP server is used to keep the course demonstration dependency free, and the service binds only to the local machine.
+
+67
+00:06:14,516 --> 00:06:22,405
+The source package includes the schema, backend, frontend, test suite, data generation, benchmark code, and running instructions.
+
+68
+00:06:22,405 --> 00:06:27,510
+The report documents the architecture, design decisions, measured results, and limitations.
+
+69
+00:06:27,510 --> 00:06:35,863
+Before submission, the group must confirm its real members and contributions and provide accessible repository and video links.
+
+70
+00:06:35,863 --> 00:06:40,968
+AI assistance is disclosed rather than attributed to fictional student work.
